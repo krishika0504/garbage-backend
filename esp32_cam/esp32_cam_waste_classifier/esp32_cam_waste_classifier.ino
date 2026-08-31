@@ -54,7 +54,7 @@ const char *WIFI_PASSWORD = "12345678";
 // Cloud Backend Configuration
 // ==========================================
 
-const char *SERVER_HOST   = "garbage-segregation.pages.dev";
+const char *SERVER_HOST   = "garbage-backend-hq2k3sj6ra-ew.a.run.app";
 const int   SERVER_PORT   = 443;
 const char *SERVER_PATH   = "/predict";
 
