@@ -149,13 +149,8 @@ void setup() {
   // 3. Initialize Camera
   setupCamera();
 
-  // 4. Configure Public DNS (Google DNS 8.8.8.8, Cloudflare 1.1.1.1) to avoid hotspot drops
+  // 4. Connect to Wi-Fi
   WiFi.mode(WIFI_STA);
-  IPAddress dns1(8, 8, 8, 8);
-  IPAddress dns2(1, 1, 1, 1);
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, dns1, dns2);
-
-  // 5. Connect to Wi-Fi
   Serial.printf("[*] Connecting to Wi-Fi '%s'", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -163,6 +158,11 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
+
+  // Override Windows Hotspot DNS with Google Public DNS (8.8.8.8) and Cloudflare (1.1.1.1)
+  IPAddress dns1(8, 8, 8, 8);
+  IPAddress dns2(1, 1, 1, 1);
+  WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
 
   Serial.println();
   Serial.println("[+] Wi-Fi Connected Successfully!");
