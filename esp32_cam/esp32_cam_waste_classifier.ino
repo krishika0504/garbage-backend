@@ -84,7 +84,7 @@ const int   LOCAL_PORT    = 5000;
 #define SENSOR_TRIG_PIN   13
 #define SENSOR_ECHO_PIN   12
 
-const float DETECTION_THRESHOLD_CM = 15.0;
+const float DETECTION_THRESHOLD_CM = 20.0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;
 
 // ==========================================
@@ -181,7 +181,7 @@ void setup() {
   // 3. Initialize Camera
   setupCamera();
 
-  // 4. Connect to Wi-Fi
+  // 4. Connect to Wi-Fi using standard DHCP
   WiFi.mode(WIFI_STA);
   Serial.printf("[*] Connecting to Wi-Fi '%s'", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -191,16 +191,17 @@ void setup() {
     Serial.print(".");
   }
 
-  // Override Windows Hotspot DNS with Google Public DNS (8.8.8.8) and Cloudflare (1.1.1.1)
-  IPAddress dns1(8, 8, 8, 8);
-  IPAddress dns2(1, 1, 1, 1);
-  WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
-
   Serial.println();
   Serial.println("[+] Wi-Fi Connected Successfully!");
   Serial.printf("[+] ESP32-CAM Local IP Address: %s\n", WiFi.localIP().toString().c_str());
   Serial.printf("[+] Network Gateway IP        : %s\n", WiFi.gatewayIP().toString().c_str());
-  Serial.printf("[+] Active DNS Server         : %s\n", WiFi.dnsIP().toString().c_str());
+  Serial.printf("[+] Assigned DNS Server       : %s\n", WiFi.dnsIP().toString().c_str());
+
+  // Configure Google Public DNS 8.8.8.8 and 1.1.1.1 fallback if gateway DNS drops public domains
+  IPAddress dns1(8, 8, 8, 8);
+  IPAddress dns2(1, 1, 1, 1);
+  WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
+  Serial.printf("[+] Active Public DNS Server  : %s, %s\n", WiFi.dnsIP(0).toString().c_str(), WiFi.dnsIP(1).toString().c_str());
 
   // 6. Start Local Camera Web Server
   server.on("/", HTTP_GET, handleRoot);
@@ -377,71 +378,95 @@ void detectAndSendToServer() {
   bool uploadSuccess = false;
 
   // ==========================================
-  // Priority 1: Fast Direct Local HTTP (<30ms on LAN Gateway)
+  // Priority 1: Google Cloud Run AI Backend (HTTPS Live Production)
   // ==========================================
-  HTTPClient http;
-  String localUrl = "http://" + WiFi.gatewayIP().toString() + ":" + String(LOCAL_PORT) + "/predict";
-  http.begin(localUrl);
-  http.addHeader("Content-Type", "image/jpeg");
-  http.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
-  http.setTimeout(1500);
+  Serial.println("[*] Connecting to Google Cloud Run: https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict ...");
+  
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure(); // Skip root certificate verification for speed
+  secureClient.setTimeout(20);
 
-  int httpCode = http.POST(fb->buf, fb->len);
-  if (httpCode == 200) {
-    Serial.printf("[+] Local Backend Connected (HTTP %d)\n", httpCode);
-    responseBody = http.getString();
-    uploadSuccess = true;
+  // Check DNS resolution
+  IPAddress resolvedIp;
+  if (WiFi.hostByName(SERVER_HOST, resolvedIp)) {
+    Serial.printf("[+] DNS Resolved %s -> %s\n", SERVER_HOST, resolvedIp.toString().c_str());
+  } else {
+    Serial.printf("[!] DNS lookup failed for %s. Re-applying Google DNS 8.8.8.8...\n", SERVER_HOST);
+    WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(8, 8, 8, 8), IPAddress(1, 1, 1, 1));
+    delay(200);
   }
-  http.end();
 
-  // ==========================================
-  // Priority 2: Google Cloud Run AI Backend (HTTPS)
-  // ==========================================
-  if (!uploadSuccess) {
-    Serial.println("[*] Connecting to Google Cloud Run: https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict ...");
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-
-    HTTPClient https;
-    https.begin(secureClient, "https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict");
+  HTTPClient https;
+  if (https.begin(secureClient, SERVER_HOST, SERVER_PORT, SERVER_PATH, true)) {
     https.addHeader("Content-Type", "image/jpeg");
     https.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
-    https.setTimeout(15000);
+    https.addHeader("Host", SERVER_HOST);
+    https.setTimeout(20000);
 
     int cloudCode = https.POST(fb->buf, fb->len);
     if (cloudCode == 200) {
-      Serial.printf("[+] Cloud Run Connected (HTTP %d)\n", cloudCode);
+      Serial.printf("[+] Google Cloud Run Connected (HTTP %d)\n", cloudCode);
       responseBody = https.getString();
       uploadSuccess = true;
     } else {
       Serial.printf("[!] Cloud Run POST error (%d): %s\n", cloudCode, https.errorToString(cloudCode).c_str());
+      if (cloudCode > 0) {
+        Serial.printf("[!] Cloud Run Response Body: %s\n", https.getString().c_str());
+      }
     }
     https.end();
+  } else {
+    Serial.println("[!] Failed to initialize HTTPS connection to Google Cloud Run");
   }
 
   // ==========================================
-  // Priority 3: Cloudflare Pages Edge Fallback (HTTPS)
+  // Priority 2: Fast Direct Local HTTP (LAN Gateway Fallback)
   // ==========================================
   if (!uploadSuccess) {
-    Serial.println("[*] Connecting to Cloudflare Edge: https://garbage-segregation.pages.dev/predict ...");
-    WiFiClientSecure edgeClient;
-    edgeClient.setInsecure();
+    Serial.printf("[*] Fallback: Checking Local Backend at http://%s:%d/predict ...\n", WiFi.gatewayIP().toString().c_str(), LOCAL_PORT);
+    HTTPClient http;
+    String localUrl = "http://" + WiFi.gatewayIP().toString() + ":" + String(LOCAL_PORT) + "/predict";
+    http.begin(localUrl);
+    http.addHeader("Content-Type", "image/jpeg");
+    http.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+    http.setTimeout(1500);
 
-    HTTPClient httpsEdge;
-    httpsEdge.begin(edgeClient, "https://garbage-segregation.pages.dev/predict");
-    httpsEdge.addHeader("Content-Type", "image/jpeg");
-    httpsEdge.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
-    httpsEdge.setTimeout(15000);
-
-    int edgeCode = httpsEdge.POST(fb->buf, fb->len);
-    if (edgeCode == 200) {
-      Serial.printf("[+] Cloudflare Edge Connected (HTTP %d)\n", edgeCode);
-      responseBody = httpsEdge.getString();
+    int httpCode = http.POST(fb->buf, fb->len);
+    if (httpCode == 200) {
+      Serial.printf("[+] Local Backend Connected (HTTP %d)\n", httpCode);
+      responseBody = http.getString();
       uploadSuccess = true;
     } else {
-      Serial.printf("[!] Cloudflare Edge error (%d): %s\n", edgeCode, httpsEdge.errorToString(edgeCode).c_str());
+      Serial.printf("[!] Local Backend unavailable (%d): %s\n", httpCode, http.errorToString(httpCode).c_str());
     }
-    httpsEdge.end();
+    http.end();
+  }
+
+  // ==========================================
+  // Priority 3: Cloudflare Pages Edge Fallback
+  // ==========================================
+  if (!uploadSuccess) {
+    Serial.println("[*] Fallback: Connecting to Cloudflare Edge: https://garbage-segregation.pages.dev/predict ...");
+    WiFiClientSecure edgeClient;
+    edgeClient.setInsecure();
+    edgeClient.setTimeout(15);
+
+    HTTPClient httpsEdge;
+    if (httpsEdge.begin(edgeClient, "https://garbage-segregation.pages.dev/predict")) {
+      httpsEdge.addHeader("Content-Type", "image/jpeg");
+      httpsEdge.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+      httpsEdge.setTimeout(15000);
+
+      int edgeCode = httpsEdge.POST(fb->buf, fb->len);
+      if (edgeCode == 200) {
+        Serial.printf("[+] Cloudflare Edge Connected (HTTP %d)\n", edgeCode);
+        responseBody = httpsEdge.getString();
+        uploadSuccess = true;
+      } else {
+        Serial.printf("[!] Cloudflare Edge error (%d): %s\n", edgeCode, httpsEdge.errorToString(edgeCode).c_str());
+      }
+      httpsEdge.end();
+    }
   }
 
   esp_camera_fb_return(fb);

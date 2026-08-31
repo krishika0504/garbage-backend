@@ -1842,12 +1842,13 @@
         }
       }
 
-      // Arduino Uno / DevKit Heartbeat
-      if (data.arduino_uno) {
-        const ard = data.arduino_uno;
+      // ESP32 DevKit / Controller Heartbeat
+      const devkitData = data.esp32_devkit || data.arduino_uno;
+      if (devkitData) {
+        const ard = devkitData;
         const statusStr = (ard.status || '').toUpperCase();
         const diffSec = ard.timestamp ? Math.max(0, Math.round((now - ard.timestamp) / 1000)) : 0;
-        const isOnline = (statusStr === 'ONLINE' || statusStr === 'CONNECTED') && (diffSec < 3600 || !ard.timestamp);
+        const isOnline = (statusStr === 'ONLINE' || statusStr === 'CONNECTED') && (diffSec < 60 || !ard.timestamp);
 
         const badge = document.getElementById('arduino-status-badge');
         const ipText = document.getElementById('arduino-ip-text');
