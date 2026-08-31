@@ -2,9 +2,9 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PORT=5000
+ENV PORT=8080
 
-# Install minimal system dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgl1 \
@@ -17,14 +17,13 @@ WORKDIR /app
 # Install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn pillow tensorflow requests
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY app/ app/
 COPY run.py .
 
-EXPOSE 5000
+EXPOSE 8080
 
-# Start Gunicorn server binding to Cloud Run $PORT
-CMD exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 run:app
+# Run with Gunicorn WSGI server binding to Cloud Run $PORT (default 8080)
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --timeout 0 run:app"]
