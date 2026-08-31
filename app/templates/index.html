@@ -1581,8 +1581,8 @@
       formData.append('file', file);
 
       let targetUrl = '/predict';
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        targetUrl = 'http://127.0.0.1:5000/predict';
+      if (window.location.hostname.includes('pages.dev')) {
+        targetUrl = 'https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict';
       }
 
       const startTime = performance.now();
@@ -1590,24 +1590,21 @@
 
       try {
         response = await fetch(targetUrl, { method: 'POST', body: formData });
-        const contentType = response.headers.get('content-type') || '';
-        if (targetUrl === '/predict' && (!response.ok || contentType.includes('text/html'))) {
-          targetUrl = 'http://127.0.0.1:5000/predict';
-          response = await fetch(targetUrl, { method: 'POST', body: formData });
-        }
       } catch (err) {
-        if (targetUrl === '/predict') {
-          try {
-            targetUrl = 'http://127.0.0.1:5000/predict';
-            response = await fetch(targetUrl, { method: 'POST', body: formData });
-          } catch (e) {
-            alert('Unable to connect to Flask server at http://127.0.0.1:5000. Please ensure python run.py is running.');
-            return;
-          }
+        console.warn('Direct predict failed, trying Cloud Run fallback:', err);
+        try {
+          response = await fetch('https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict', { method: 'POST', body: formData });
+        } catch (e) {
+          alert('Upload failed: Unable to connect to AI classification server. Please check internet connection.');
+          return;
         }
       }
 
-      if (!response || !response.ok) return;
+      if (!response || !response.ok) {
+        console.error('Server error response:', response);
+        alert('Server returned error: HTTP ' + (response ? response.status : 'unknown'));
+        return;
+      }
 
       const data = await response.json();
       const endTime = performance.now();
