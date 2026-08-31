@@ -42,6 +42,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 
 // ==========================================
 // Wi-Fi Configuration
@@ -99,7 +100,7 @@ const int   LOCAL_PORT    = 5000;
 // Detection Settings
 // ==========================================
 
-#define DETECTION_THRESHOLD_CM 15.0
+#define DETECTION_THRESHOLD_CM 19.0
 
 // ==========================================
 // Web Server & State
@@ -357,102 +358,76 @@ void detectAndSendToServer() {
   bool uploadSuccess = false;
 
   // ==========================================
-  // Priority 1: Fast Direct HTTP (Local Gateway LAN)
+  // Priority 1: Fast Direct Local HTTP (<30ms on LAN Gateway)
   // ==========================================
-  WiFiClient localClient;
-  localClient.setTimeout(3);
+  HTTPClient http;
+  String localUrl = "http://" + WiFi.gatewayIP().toString() + ":" + String(LOCAL_PORT) + "/predict";
+  http.begin(localUrl);
+  http.addHeader("Content-Type", "image/jpeg");
+  http.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+  http.setTimeout(1500);
 
-  if (localClient.connect(WiFi.gatewayIP(), LOCAL_PORT)) {
-    Serial.printf("[+] Connected to Local Backend at http://%s:%d/predict\n", WiFi.gatewayIP().toString().c_str(), LOCAL_PORT);
-    localClient.printf("POST /predict HTTP/1.1\r\n");
-    localClient.printf("Host: %s:%d\r\n", WiFi.gatewayIP().toString().c_str(), LOCAL_PORT);
-    localClient.print("Content-Type: image/jpeg\r\n");
-    localClient.printf("Content-Length: %u\r\n", fb->len);
-    localClient.print("User-Agent: ESP32-CAM-Waste-Detector\r\n");
-    localClient.print("Connection: close\r\n\r\n");
+  int httpCode = http.POST(fb->buf, fb->len);
+  if (httpCode == 200) {
+    Serial.printf("[+] Local Backend Connected (HTTP %d)\n", httpCode);
+    responseBody = http.getString();
+    uploadSuccess = true;
+  }
+  http.end();
 
-    localClient.write(fb->buf, fb->len);
-    Serial.println("[*] Image sent. Waiting for response...");
+  // ==========================================
+  // Priority 2: Google Cloud Run AI Backend (HTTPS)
+  // ==========================================
+  if (!uploadSuccess) {
+    Serial.println("[*] Connecting to Google Cloud Run: https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict ...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
 
-    unsigned long timeout = millis();
-    bool isBody = false;
+    HTTPClient https;
+    https.begin(secureClient, "https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict");
+    https.addHeader("Content-Type", "image/jpeg");
+    https.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+    https.setTimeout(15000);
 
-    while (localClient.connected() && millis() - timeout < 8000) {
-      while (localClient.available()) {
-        String line = localClient.readStringUntil('\n');
-        line.trim();
-        if (!isBody && line.length() == 0) {
-          isBody = true;
-          continue;
-        }
-        if (isBody) {
-          responseBody += line;
-        }
-        timeout = millis();
-      }
+    int cloudCode = https.POST(fb->buf, fb->len);
+    if (cloudCode == 200) {
+      Serial.printf("[+] Cloud Run Connected (HTTP %d)\n", cloudCode);
+      responseBody = https.getString();
+      uploadSuccess = true;
+    } else {
+      Serial.printf("[!] Cloud Run POST error (%d): %s\n", cloudCode, https.errorToString(cloudCode).c_str());
     }
-    localClient.stop();
-    uploadSuccess = (responseBody.length() > 0);
+    https.end();
   }
 
   // ==========================================
-  // Priority 2: Cloud HTTPS (https://garbage-segregation.pages.dev/predict)
+  // Priority 3: Cloudflare Pages Edge Fallback (HTTPS)
   // ==========================================
   if (!uploadSuccess) {
-    Serial.printf("[*] Connecting to Cloud HTTPS: https://%s%s ...\n", SERVER_HOST, SERVER_PATH);
+    Serial.println("[*] Connecting to Cloudflare Edge: https://garbage-segregation.pages.dev/predict ...");
+    WiFiClientSecure edgeClient;
+    edgeClient.setInsecure();
 
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    secureClient.setTimeout(15);
-    secureClient.setHandshakeTimeout(15);
+    HTTPClient httpsEdge;
+    httpsEdge.begin(edgeClient, "https://garbage-segregation.pages.dev/predict");
+    httpsEdge.addHeader("Content-Type", "image/jpeg");
+    httpsEdge.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+    httpsEdge.setTimeout(15000);
 
-    bool connected = secureClient.connect(SERVER_HOST, SERVER_PORT);
-    if (!connected) {
-      // Retry with Anycast fallback IP
-      Serial.printf("[!] Hostname connect failed. Retrying with Anycast IP (%s)...\n", SERVER_FALLBACK_IP);
-      IPAddress cloudIP;
-      cloudIP.fromString(SERVER_FALLBACK_IP);
-      connected = secureClient.connect(cloudIP, SERVER_PORT);
-    }
-
-    if (connected) {
-      Serial.println("[+] Connected to Cloud HTTPS!");
-      secureClient.printf("POST %s HTTP/1.1\r\n", SERVER_PATH);
-      secureClient.printf("Host: %s\r\n", SERVER_HOST);
-      secureClient.print("Content-Type: image/jpeg\r\n");
-      secureClient.printf("Content-Length: %u\r\n", fb->len);
-      secureClient.print("User-Agent: ESP32-CAM-Waste-Detector\r\n");
-      secureClient.print("Connection: close\r\n\r\n");
-
-      secureClient.write(fb->buf, fb->len);
-      Serial.println("[*] Image sent to Cloud. Waiting for response...");
-
-      unsigned long timeout = millis();
-      bool isBody = false;
-
-      while (secureClient.connected() && millis() - timeout < 12000) {
-        while (secureClient.available()) {
-          String line = secureClient.readStringUntil('\n');
-          line.trim();
-          if (!isBody && line.length() == 0) {
-            isBody = true;
-            continue;
-          }
-          if (isBody) {
-            responseBody += line;
-          }
-          timeout = millis();
-        }
-      }
-      secureClient.stop();
-      uploadSuccess = (responseBody.length() > 0);
+    int edgeCode = httpsEdge.POST(fb->buf, fb->len);
+    if (edgeCode == 200) {
+      Serial.printf("[+] Cloudflare Edge Connected (HTTP %d)\n", edgeCode);
+      responseBody = httpsEdge.getString();
+      uploadSuccess = true;
     } else {
-      Serial.println("[!] Cloud HTTPS connection failed.");
+      Serial.printf("[!] Cloudflare Edge error (%d): %s\n", edgeCode, httpsEdge.errorToString(edgeCode).c_str());
     }
+    httpsEdge.end();
   }
 
   esp_camera_fb_return(fb);
   Serial.println("[+] Connection closed");
+
 
   // ==========================================
   // Parse Classification JSON & Firebase Storage URL

@@ -10,7 +10,7 @@
  *   - NO SERVO MOTOR (Servo handled separately by DevKit/Controller)
  *
  * Operational Flow:
- *   1. Connects to Wi-Fi with Public DNS (8.8.8.8 / 1.1.1.1) to guarantee DNS resolution.
+ *   1. Connects to Wi-Fi with Public DNS (8.8.8.8 / 1.1.1.1).
  *   2. Starts local camera web server (/, /stream, /capture).
  *   3. Ultrasonic sensor measures distance continuously.
  *   4. When object distance < 15 cm (and >= 2 cm):
@@ -18,30 +18,23 @@
  *      - Turns Flash LED ON (GPIO 4 HIGH).
  *      - Captures fresh JPEG image from OV2640.
  *      - Transmits frame to AI Backend:
- *          * Priority 1: Fast Direct HTTP (http://<Gateway-IP>:5000/predict) if on same LAN.
- *          * Priority 2: Cloud HTTPS (https://garbage-segregation.pages.dev/predict).
+ *          * Priority 1: Fast Direct Local HTTP (http://<Gateway-IP>:5000/predict).
+ *          * Priority 2: Google Cloud Run (https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict).
+ *          * Priority 3: Cloudflare Edge (https://garbage-segregation.pages.dev/predict).
  *      - Backend stores image in Firebase Storage:
  *        gs://garbage-fa1b3.firebasestorage.app/captures/
  *      - Receives prediction result (Class, Confidence, Servo Angle, Image URL).
  *      - Turns Flash LED OFF (GPIO 4 LOW).
  *      - 3-second cooldown before accepting next object.
  *   5. Sends Firebase Heartbeat every 10 seconds to /hardware_heartbeats/esp32_cam.json.
- *
- * Local Camera Endpoints:
- *   http://<ESP32-IP>/
- *   http://<ESP32-IP>/stream
- *   http://<ESP32-IP>/capture
  */
-
-// ==========================================
-// Libraries
-// ==========================================
 
 #include "esp_camera.h"
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 
 // ==========================================
 // Wi-Fi Configuration
@@ -57,9 +50,6 @@ const char *WIFI_PASSWORD = "12345678";
 const char *SERVER_HOST   = "garbage-backend-hq2k3sj6ra-ew.a.run.app";
 const int   SERVER_PORT   = 443;
 const char *SERVER_PATH   = "/predict";
-
-// Cloudflare Anycast fallback IP if local hotspot DNS drops
-const char *SERVER_FALLBACK_IP = "172.66.47.139";
 
 // Local Flask Backend Port on LAN Gateway (Optional fast bypass)
 const int   LOCAL_PORT    = 5000;
@@ -82,46 +72,89 @@ const int   LOCAL_PORT    = 5000;
 #define Y4_GPIO_NUM       19
 #define Y3_GPIO_NUM       18
 #define Y2_GPIO_NUM        5
-
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
 // ==========================================
-// Hardware Pins
+// Peripheral Pins & Settings
 // ==========================================
 
 #define FLASH_LED_PIN      4
 #define SENSOR_TRIG_PIN   13
 #define SENSOR_ECHO_PIN   12
 
-// ==========================================
-// Detection Settings
-// ==========================================
-
-#define DETECTION_THRESHOLD_CM 15.0
-
-// ==========================================
-// Web Server & State
-// ==========================================
-
-WebServer server(80);
-
-bool isProcessing = false;
-unsigned long lastHeartbeatTime = 0;
+const float DETECTION_THRESHOLD_CM = 15.0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;
 
 // ==========================================
-// Function Declarations
+// Global State
 // ==========================================
 
-void setupCamera();
-float measureDistanceCM();
-void detectAndSendToServer();
-void sendHeartbeat();
+WebServer server(80);
+unsigned long lastHeartbeatTime = 0;
+bool isProcessing = false;
+
+// Forward declarations
 void handleRoot();
 void handleStream();
 void handleCapture();
+void sendHeartbeat();
+void detectAndSendToServer();
+float measureDistanceCM();
+void setupCamera();
+
+// ==========================================
+// HTTP HANDLERS FOR LOCAL CAMERA WEB SERVER
+// ==========================================
+
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><title>ESP32-CAM Live View</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>body{font-family:Arial,sans-serif;background:#111;color:#fff;text-align:center;padding:20px;}";
+  html += "img{max-width:100%;height:auto;border:2px solid #34d399;border-radius:8px;}";
+  html += ".btn{display:inline-block;padding:10px 20px;margin:10px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;}";
+  html += "</style></head><body>";
+  html += "<h2>🗑️ Smart Waste Classifier - ESP32-CAM</h2>";
+  html += "<p>Live Camera Stream:</p>";
+  html += "<img src='/stream' /><br>";
+  html += "<a href='/capture' class='btn' target='_blank'>Capture Single Frame</a>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleStream() {
+  WiFiClient client = server.client();
+  String response = "HTTP/1.1 200 OK\r\n";
+  response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
+  server.sendContent(response);
+
+  while (client.connected()) {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (!fb) break;
+
+    response = "--frame\r\n";
+    response += "Content-Type: image/jpeg\r\n";
+    response += "Content-Length: " + String(fb->len) + "\r\n\r\n";
+    server.sendContent(response);
+
+    client.write(fb->buf, fb->len);
+    server.sendContent("\r\n");
+    esp_camera_fb_return(fb);
+    delay(30);
+  }
+}
+
+void handleCapture() {
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    server.send(500, "text/plain", "Camera capture failed");
+    return;
+  }
+  server.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
+  server.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
+  esp_camera_fb_return(fb);
+}
 
 // ==========================================
 // SETUP
@@ -148,7 +181,7 @@ void setup() {
   // 3. Initialize Camera
   setupCamera();
 
-  // 4. Configure Public DNS (Google DNS 8.8.8.8, Cloudflare 1.1.1.1) to avoid hotspot drops
+  // 4. Configure Public DNS (Google DNS 8.8.8.8, Cloudflare 1.1.1.1)
   WiFi.mode(WIFI_STA);
   IPAddress dns1(8, 8, 8, 8);
   IPAddress dns2(1, 1, 1, 1);
@@ -191,29 +224,24 @@ void setup() {
 // ==========================================
 
 void loop() {
-  // 1. Handle incoming HTTP requests for live streaming & capture
   server.handleClient();
 
-  // 2. Periodic Firebase Heartbeat (every 10s)
   if (millis() - lastHeartbeatTime >= HEARTBEAT_INTERVAL) {
     lastHeartbeatTime = millis();
     sendHeartbeat();
   }
 
-  // 3. Skip sensor trigger if already processing
   if (isProcessing) {
     delay(10);
     return;
   }
 
-  // 4. Measure distance with ultrasonic sensor
   float distance = measureDistanceCM();
 
   if (distance > 0 && distance < 50.0) {
     Serial.printf("[SENSOR] Distance: %.2f cm\n", distance);
   }
 
-  // 5. Object Detection Trigger (< 15 cm and valid reading >= 2 cm)
   if (distance >= 2.0 && distance < DETECTION_THRESHOLD_CM) {
     Serial.println();
     Serial.println("*****************************************");
@@ -221,23 +249,17 @@ void loop() {
     Serial.println("*****************************************");
 
     isProcessing = true;
-
-    // Allow waste object to settle in bin chute
     delay(400);
 
-    // Turn Flash LED ON
     Serial.println("[*] Flash LED ON");
     digitalWrite(FLASH_LED_PIN, HIGH);
     delay(300);
 
-    // Capture and upload frame
     detectAndSendToServer();
 
-    // Turn Flash LED OFF
     digitalWrite(FLASH_LED_PIN, LOW);
     Serial.println("[*] Flash LED OFF");
 
-    // Cooldown pause
     Serial.println("[*] Cooldown: 3 seconds...");
     delay(3000);
 
@@ -329,13 +351,11 @@ float measureDistanceCM() {
 void detectAndSendToServer() {
   Serial.println("[*] Capturing image...");
 
-  // 1. Flush stale DMA buffer
   camera_fb_t *fb = esp_camera_fb_get();
   if (fb) {
     esp_camera_fb_return(fb);
   }
 
-  // 2. Grab fresh frame
   fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("[!] Camera capture failed!");
@@ -357,98 +377,71 @@ void detectAndSendToServer() {
   bool uploadSuccess = false;
 
   // ==========================================
-  // Priority 1: Fast Direct HTTP (Local Gateway LAN)
+  // Priority 1: Fast Direct Local HTTP (<30ms on LAN Gateway)
   // ==========================================
-  WiFiClient localClient;
-  localClient.setTimeout(3);
+  HTTPClient http;
+  String localUrl = "http://" + WiFi.gatewayIP().toString() + ":" + String(LOCAL_PORT) + "/predict";
+  http.begin(localUrl);
+  http.addHeader("Content-Type", "image/jpeg");
+  http.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+  http.setTimeout(1500);
 
-  if (localClient.connect(WiFi.gatewayIP(), LOCAL_PORT)) {
-    Serial.printf("[+] Connected to Local Backend at http://%s:%d/predict\n", WiFi.gatewayIP().toString().c_str(), LOCAL_PORT);
-    localClient.printf("POST /predict HTTP/1.1\r\n");
-    localClient.printf("Host: %s:%d\r\n", WiFi.gatewayIP().toString().c_str(), LOCAL_PORT);
-    localClient.print("Content-Type: image/jpeg\r\n");
-    localClient.printf("Content-Length: %u\r\n", fb->len);
-    localClient.print("User-Agent: ESP32-CAM-Waste-Detector\r\n");
-    localClient.print("Connection: close\r\n\r\n");
+  int httpCode = http.POST(fb->buf, fb->len);
+  if (httpCode == 200) {
+    Serial.printf("[+] Local Backend Connected (HTTP %d)\n", httpCode);
+    responseBody = http.getString();
+    uploadSuccess = true;
+  }
+  http.end();
 
-    localClient.write(fb->buf, fb->len);
-    Serial.println("[*] Image sent. Waiting for response...");
+  // ==========================================
+  // Priority 2: Google Cloud Run AI Backend (HTTPS)
+  // ==========================================
+  if (!uploadSuccess) {
+    Serial.println("[*] Connecting to Google Cloud Run: https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict ...");
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
 
-    unsigned long timeout = millis();
-    bool isBody = false;
+    HTTPClient https;
+    https.begin(secureClient, "https://garbage-backend-hq2k3sj6ra-ew.a.run.app/predict");
+    https.addHeader("Content-Type", "image/jpeg");
+    https.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+    https.setTimeout(15000);
 
-    while (localClient.connected() && millis() - timeout < 8000) {
-      while (localClient.available()) {
-        String line = localClient.readStringUntil('\n');
-        line.trim();
-        if (!isBody && line.length() == 0) {
-          isBody = true;
-          continue;
-        }
-        if (isBody) {
-          responseBody += line;
-        }
-        timeout = millis();
-      }
+    int cloudCode = https.POST(fb->buf, fb->len);
+    if (cloudCode == 200) {
+      Serial.printf("[+] Cloud Run Connected (HTTP %d)\n", cloudCode);
+      responseBody = https.getString();
+      uploadSuccess = true;
+    } else {
+      Serial.printf("[!] Cloud Run POST error (%d): %s\n", cloudCode, https.errorToString(cloudCode).c_str());
     }
-    localClient.stop();
-    uploadSuccess = (responseBody.length() > 0);
+    https.end();
   }
 
   // ==========================================
-  // Priority 2: Cloud HTTPS (https://garbage-segregation.pages.dev/predict)
+  // Priority 3: Cloudflare Pages Edge Fallback (HTTPS)
   // ==========================================
   if (!uploadSuccess) {
-    Serial.printf("[*] Connecting to Cloud HTTPS: https://%s%s ...\n", SERVER_HOST, SERVER_PATH);
+    Serial.println("[*] Connecting to Cloudflare Edge: https://garbage-segregation.pages.dev/predict ...");
+    WiFiClientSecure edgeClient;
+    edgeClient.setInsecure();
 
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure();
-    secureClient.setTimeout(15);
-    secureClient.setHandshakeTimeout(15);
+    HTTPClient httpsEdge;
+    httpsEdge.begin(edgeClient, "https://garbage-segregation.pages.dev/predict");
+    httpsEdge.addHeader("Content-Type", "image/jpeg");
+    httpsEdge.addHeader("User-Agent", "ESP32-CAM-Waste-Detector");
+    httpsEdge.setTimeout(15000);
 
-    bool connected = secureClient.connect(SERVER_HOST, SERVER_PORT);
-    if (!connected) {
-      // Retry with Anycast fallback IP
-      Serial.printf("[!] Hostname connect failed. Retrying with Anycast IP (%s)...\n", SERVER_FALLBACK_IP);
-      IPAddress cloudIP;
-      cloudIP.fromString(SERVER_FALLBACK_IP);
-      connected = secureClient.connect(cloudIP, SERVER_PORT);
-    }
-
-    if (connected) {
-      Serial.println("[+] Connected to Cloud HTTPS!");
-      secureClient.printf("POST %s HTTP/1.1\r\n", SERVER_PATH);
-      secureClient.printf("Host: %s\r\n", SERVER_HOST);
-      secureClient.print("Content-Type: image/jpeg\r\n");
-      secureClient.printf("Content-Length: %u\r\n", fb->len);
-      secureClient.print("User-Agent: ESP32-CAM-Waste-Detector\r\n");
-      secureClient.print("Connection: close\r\n\r\n");
-
-      secureClient.write(fb->buf, fb->len);
-      Serial.println("[*] Image sent to Cloud. Waiting for response...");
-
-      unsigned long timeout = millis();
-      bool isBody = false;
-
-      while (secureClient.connected() && millis() - timeout < 12000) {
-        while (secureClient.available()) {
-          String line = secureClient.readStringUntil('\n');
-          line.trim();
-          if (!isBody && line.length() == 0) {
-            isBody = true;
-            continue;
-          }
-          if (isBody) {
-            responseBody += line;
-          }
-          timeout = millis();
-        }
-      }
-      secureClient.stop();
-      uploadSuccess = (responseBody.length() > 0);
+    int edgeCode = httpsEdge.POST(fb->buf, fb->len);
+    if (edgeCode == 200) {
+      Serial.printf("[+] Cloudflare Edge Connected (HTTP %d)\n", edgeCode);
+      responseBody = httpsEdge.getString();
+      uploadSuccess = true;
     } else {
-      Serial.println("[!] Cloud HTTPS connection failed.");
+      Serial.printf("[!] Cloudflare Edge error (%d): %s\n", edgeCode, httpsEdge.errorToString(edgeCode).c_str());
     }
+    httpsEdge.end();
   }
 
   esp_camera_fb_return(fb);
@@ -493,116 +486,19 @@ void sendHeartbeat() {
 
   WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(8);
+  client.setTimeout(4);
 
-  if (!client.connect("garbage-fa1b3-default-rtdb.firebaseio.com", 443)) {
-    return;
-  }
+  const char *host = "garbage-fa1b3-default-rtdb.firebaseio.com";
+  if (!client.connect(host, 443)) return;
 
-  String payload = "{\"device\":\"esp32_cam\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"status\":\"ONLINE\",\"timestamp\":{\".sv\":\"timestamp\"}}";
+  String payload = "{\"device\":\"esp32_cam\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"status\":\"ONLINE\",\"rssi\":" + String(WiFi.RSSI()) + ",\"timestamp\":{\".sv\":\"timestamp\"}}";
 
   client.println("PUT /hardware_heartbeats/esp32_cam.json HTTP/1.1");
-  client.println("Host: garbage-fa1b3-default-rtdb.firebaseio.com");
+  client.printf("Host: %s\r\n", host);
   client.println("Content-Type: application/json");
-  client.print("Content-Length: ");
-  client.println(payload.length());
-  client.println("Connection: close");
-  client.println();
-  client.print(payload);
-
-  unsigned long timeout = millis();
-  while (client.connected() && !client.available()) {
-    if (millis() - timeout > 2000) break;
-    delay(10);
-  }
+  client.printf("Content-Length: %d\r\n", payload.length());
+  client.println("Connection: close\r\n");
+  client.println(payload);
 
   client.stop();
-}
-
-// ==========================================
-// LOCAL CAMERA WEB PAGE
-// ==========================================
-
-void handleRoot() {
-  String page = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ESP32-CAM Live Camera</title>
-  <style>
-    body { margin: 0; padding: 20px; background: #111; color: white; font-family: Arial; text-align: center; }
-    h1 { margin-bottom: 20px; }
-    img { width: 100%; max-width: 800px; height: auto; border: 2px solid #444; border-radius: 10px; }
-    button { margin-top: 20px; padding: 12px 25px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <h1>ESP32-CAM Live Camera</h1>
-  <img src="/stream">
-  <br>
-  <button onclick="location.href='/capture'">Capture Image</button>
-</body>
-</html>
-)rawliteral";
-
-  server.send(200, "text/html", page);
-}
-
-// ==========================================
-// LIVE CAMERA STREAM
-// ==========================================
-
-void handleStream() {
-  WiFiClient client = server.client();
-
-  client.print("HTTP/1.1 200 OK\r\n"
-               "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n"
-               "Cache-Control: no-cache\r\n"
-               "Pragma: no-cache\r\n"
-               "Access-Control-Allow-Origin: *\r\n\r\n");
-
-  Serial.println("[STREAM] Client connected");
-
-  while (client.connected()) {
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (!fb) {
-      Serial.println("[STREAM] Camera capture failed");
-      break;
-    }
-
-    client.printf("--frame\r\n"
-                  "Content-Type: image/jpeg\r\n"
-                  "Content-Length: %u\r\n\r\n",
-                  fb->len);
-
-    client.write(fb->buf, fb->len);
-    client.print("\r\n");
-
-    esp_camera_fb_return(fb);
-    delay(50);
-  }
-
-  Serial.println("[STREAM] Client disconnected");
-}
-
-// ==========================================
-// SINGLE IMAGE CAPTURE
-// ==========================================
-
-void handleCapture() {
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb) {
-    server.send(500, "text/plain", "Camera capture failed");
-    return;
-  }
-
-  server.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
-  server.setContentLength(fb->len);
-  server.send(200, "image/jpeg");
-
-  WiFiClient client = server.client();
-  client.write(fb->buf, fb->len);
-
-  esp_camera_fb_return(fb);
 }
