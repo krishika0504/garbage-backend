@@ -12,14 +12,6 @@ predict_bp = Blueprint('predict', __name__)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
-@predict_bp.route('/', methods=['GET'])
-def root():
-    return jsonify({
-        'status': 'online',
-        'service': 'Smart Waste Classification AI API',
-        'endpoints': ['/predict', '/health', '/camera/config']
-    }), 200
-
 @predict_bp.route('/health', methods=['GET'])
 
 def health():

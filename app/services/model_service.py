@@ -2,8 +2,6 @@ import os
 import io
 import numpy as np
 from PIL import Image
-import tensorflow as tf
-import keras
 from app.config import Config
 
 class ModelService:
@@ -12,20 +10,30 @@ class ModelService:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ModelService, cls).__new__(cls)
+            cls._instance.model = None
             cls._instance._load_model()
         return cls._instance
 
     def _load_model(self):
+        if self.model is not None:
+            return
+
         print(f"[*] Loading Keras model from {Config.MODEL_PATH}...")
-        self.model = keras.models.load_model(Config.MODEL_PATH)
-        
-        if os.path.exists(Config.WEIGHTS_PATH):
-            print(f"[*] Loading best weights from {Config.WEIGHTS_PATH}...")
-            self.model.load_weights(Config.WEIGHTS_PATH)
-        else:
-            print("[!] Weights file not found, using base model weights.")
-        
-        print("[+] Model and weights loaded successfully.")
+        try:
+            import tensorflow as tf
+            import keras
+            self.model = keras.models.load_model(Config.MODEL_PATH)
+            
+            if os.path.exists(Config.WEIGHTS_PATH):
+                print(f"[*] Loading best weights from {Config.WEIGHTS_PATH}...")
+                self.model.load_weights(Config.WEIGHTS_PATH)
+            else:
+                print("[!] Weights file not found, using base model weights.")
+            
+            print("[+] Model and weights loaded successfully.")
+        except Exception as e:
+            print(f"[!] Error loading model: {e}")
+            raise e
 
     def preprocess_image(self, image_input):
         """
@@ -47,6 +55,9 @@ class ModelService:
         return img_batch
 
     def predict(self, image_input):
+        if self.model is None:
+            self._load_model()
+
         img_batch = self.preprocess_image(image_input)
         raw_pred = self.model.predict(img_batch, verbose=0)
         score = float(raw_pred[0][0])
