@@ -10,6 +10,8 @@ __pycache__/
 .env
 .env.*
 !.env.example
+service-account*.json
+*service_account*.json
 
 # Node / Cloudflare
 node_modules/
