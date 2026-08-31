@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: garbage-segregation-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt && pip install gunicorn tensorflow pillow requests
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 run:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FIREBASE_DATABASE_URL
+        value: https://garbage-fa1b3-default-rtdb.firebaseio.com
+      - key: FIREBASE_STORAGE_BUCKET
+        value: garbage-fa1b3.firebasestorage.app

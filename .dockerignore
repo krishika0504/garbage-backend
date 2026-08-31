@@ -1,0 +1,11 @@
+.git
+.gitignore
+.wrangler
+node_modules
+venv
+__pycache__
+*.pyc
+esp32_cam
+esp32_devkit
+public
+.env

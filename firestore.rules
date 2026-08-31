@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Hardware Microcontroller & Client Access Rules
+    match /hardware_heartbeats/{deviceId} {
+      allow read, write: if true;
+    }
+    match /classifications/{classificationId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

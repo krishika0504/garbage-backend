@@ -1,0 +1,25 @@
+# Python
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Node / Cloudflare
+node_modules/
+.wrangler/
+package-lock.json
+
+# Antigravity & IDE
+.agents/
+skills-lock.json
+
+# Uploads & Temp Data
+uploads/*
+!uploads/.gitkeep

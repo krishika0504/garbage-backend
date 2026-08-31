@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Waste Segregation System - AI Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --sidebar-bg: #0f172a;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent-green: #10b981;
+      --accent-green-bg: rgba(16, 185, 129, 0.12);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-bg: rgba(6, 182, 212, 0.12);
+      --accent-orange: #f59e0b;
+      --accent-orange-bg: rgba(245, 158, 11, 0.12);
+      --accent-rose: #f43f5e;
+      --accent-rose-bg: rgba(244, 63, 94, 0.12);
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    [data-theme="light"] {
+      --bg-main: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent-green: #059669;
+      --accent-green-bg: #ecfdf5;
+      --accent-cyan: #0284c7;
+      --accent-cyan-bg: #f0f9ff;
+      --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', 'Inter', sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: 260px;
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1rem;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0 0.5rem 1.5rem 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 1.5rem;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .brand-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .brand-name span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .nav-menu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      flex: 1;
+    }
+
+    .nav-item button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .nav-item button:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active button {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      padding: 1rem;
+      border-radius: 14px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .system-status-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .system-status-desc {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* Main Content Wrapper */
+    .content-wrapper {
+      margin-left: 260px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* Header Bar */
+    header {
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--sidebar-bg);
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+
+    .header-title h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header-title p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .btn-theme {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      padding: 0.45rem 0.9rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .clock-display {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .admin-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .admin-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    /* Page Layout */
+    .container {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Metric Summary KPI Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 1200px) {
+      .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 1.25rem;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+
+    .kpi-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.35rem;
+    }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .kpi-icon-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+
+    /* Panels Layout */
+    .grid-3-col {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1.1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+      .grid-3-col { grid-template-columns: 1fr; }
+    }
+
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .badge-live {
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+    }
+
+    /* ESP32 Camera Controls */
+    .ip-input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .ip-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      padding: 0.5rem 0.8rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    .btn-feed {
+      background: var(--card-border);
+      color: var(--text-primary);
+      border: none;
+      padding: 0.5rem 0.9rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-snap {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .camera-viewport {
+      width: 100%;
+      height: 240px;
+      background: #000;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      border: 1px solid var(--card-border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .camera-viewport img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* AI Inspector Panel */
+    .inspector-preview {
+      width: 100%;
+      height: 200px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      border: 1px solid var(--card-border);
+    }
+
+    .inspector-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .telemetry-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .telemetry-pill {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      padding: 0.65rem;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+
+    .telemetry-pill strong {
+      display: block;
+      font-size: 0.85rem;
+      margin-top: 0.2rem;
+      color: var(--text-primary);
+    }
+
+    /* Latest Classification Card */
+    .gauge-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .circular-gauge {
+      width: 110px;
+      height: 110px;
+      position: relative;
+      margin-bottom: 0.75rem;
+    }
+
+    .circular-gauge svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 8;
+    }
+
+    .gauge-circle {
+      fill: none;
+      stroke: var(--accent-green);
+      stroke-width: 8;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 28;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.8s ease;
+    }
+
+    .gauge-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .gauge-percent {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .result-badge-mini {
+      display: inline-block;
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .result-badge-mini.wet {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+    }
+
+    .result-badge-mini.dry {
+      background: var(--accent-cyan-bg);
+      color: var(--accent-cyan);
+    }
+
+    .classification-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+    }
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .detail-item span:first-child {
+      color: var(--text-secondary);
+    }
+
+    /* Bin Status Panel */
+    .bin-status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .bin-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem;
+    }
+
+    .bin-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 9999px;
+      transition: width 0.5s ease;
+    }
+
+    .dry-fill { background: var(--accent-cyan); }
+    .wet-fill { background: var(--accent-green); }
+
+    .sensor-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .sensor-item {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Bottom Grid 2 Columns */
+    .grid-2-col {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1000px) {
+      .grid-2-col { grid-template-columns: 1fr; }
+    }
+
+    .chart-container {
+      height: 220px;
+      position: relative;
+    }
+
+    /* Tab switching utility */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Sidebar -->
+  <aside>
+    <div class="brand-logo">
+      <div class="logo-icon">♻️</div>
+      <div class="brand-name">
+        Smart Waste
+        <span>Segregation System</span>
+      </div>
+    </div>
+
+    <ul class="nav-menu">
+      <li class="nav-item active" data-tab="tab-dashboard">
+        <button type="button">📊 <span>Dashboard</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-camera">
+        <button type="button">📷 <span>Check Live Camera</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-inspector">
+        <button type="button">⚡ <span>Live AI Inspector</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-logs">
+        <button type="button">📄 <span>Classification Logs</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-bins">
+        <button type="button">🗑️ <span>Bin Status</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-analytics">
+        <button type="button">📈 <span>Reports & Analytics</span></button>
+      </li>
+      <li class="nav-item" data-tab="tab-settings">
+        <button type="button">⚙️ <span>System Settings</span></button>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="system-status-title">
+        <span>🟢</span> System Status
+      </div>
+      <div class="system-status-desc">All Systems Operational</div>
+      <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.5rem; display: flex; justify-content: space-between;">
+        <span>v1.0.0</span>
+        <span>12ms</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Content Wrapper -->
+  <div class="content-wrapper">
+    <!-- Header Bar -->
+    <header>
+      <div class="header-title">
+        <h2 id="page-title">Dashboard</h2>
+        <p id="page-subtitle">Real-time overview of your waste segregation system</p>
+      </div>
+
+      <div class="header-right">
+        <button type="button" class="btn-theme" id="btn-theme-toggle">
+          <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
+        </button>
+        <div class="clock-display" id="live-clock">19 Aug 2026 | 04:07:04 PM</div>
+        <div class="admin-badge">
+          <div class="admin-avatar">A</div>
+          <div style="font-size: 0.85rem;">
+            <div style="font-weight: 600;">Admin</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Administrator</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+
+      <!-- TAB 1: DASHBOARD MAIN -->
+      <div id="tab-dashboard" class="tab-content active">
+        <!-- 5 KPI Summary Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <div class="kpi-label">Total Classifications</div>
+              <div class="kpi-value" id="kpi-total">0</div>
+              <div class="kpi-sub" style="color: #34d399;">Live Real-Time Count</div>
+            </div>
+            <div class="kpi-icon-wrapper" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📊</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <div class="kpi-label">Dry Waste</div>
+              <div class="kpi-value" id="kpi-dry">0</div>
+              <div class="kpi-sub" id="kpi-dry-pct">0% of total</div>
+            </div>
+            <div class="kpi-icon-wrapper" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;">📦</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <div class="kpi-label">Wet Waste</div>
+              <div class="kpi-value" id="kpi-wet">0</div>
+              <div class="kpi-sub" id="kpi-wet-pct">0% of total</div>
+            </div>
+            <div class="kpi-icon-wrapper" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">🍃</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <div class="kpi-label">Servo Action</div>
+              <div class="kpi-value" id="kpi-servo" style="font-size: 1.3rem;">Servo 1: 90°</div>
+              <div class="kpi-sub" style="color: #34d399;">Full Flip 0° / 180°</div>
+            </div>
+            <div class="kpi-icon-wrapper" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">⚙️</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <div class="kpi-label">Avg Confidence</div>
+              <div class="kpi-value" id="kpi-conf">0.0%</div>
+              <div class="kpi-sub">MobileNetV2 Accuracy</div>
+            </div>
+            <div class="kpi-icon-wrapper" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e;">⚡</div>
+          </div>
+        </div>
+
+        <!-- Hardware Heartbeat & Live Telemetry Panel -->
+        <div class="panel-card" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">📡 Hardware Live Status Telemetry</div>
+            <div style="font-size: 0.75rem; color: #34d399; font-weight: 500;">Firebase Realtime Sync</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <!-- ESP32-CAM Status Card -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.8rem;">
+                <div style="font-size: 1.8rem;">📷</div>
+                <div>
+                  <div style="font-weight: 600; font-size: 0.95rem;">ESP32-CAM Board</div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary);" id="esp32-ip-text">IP: 192.168.159.156</div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);" id="esp32-last-seen">Last heartbeat: --</div>
+                </div>
+              </div>
+              <div id="esp32-status-badge" style="padding: 0.35rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                ○ OFFLINE
+              </div>
+            </div>
+
+            <!-- Arduino Uno Status Card -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.8rem;">
+                <div style="font-size: 1.8rem;">🤖</div>
+                <div>
+                  <div style="font-weight: 600; font-size: 0.95rem;">Arduino Uno / Controller</div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary);" id="arduino-ip-text">IP: 192.168.122.97</div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);" id="arduino-last-seen">Last heartbeat: --</div>
+                </div>
+              </div>
+              <div id="arduino-status-badge" style="padding: 0.35rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                ○ OFFLINE
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Manual Servo Motor Control Override Panel -->
+        <div class="panel-card" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">🕹️ Manual Servo Motor Override Control</div>
+            <div style="font-size: 0.75rem; color: #6366f1; font-weight: 500;">Firebase Realtime Dispatch</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; align-items: center;">
+            <!-- Quick Preset Buttons -->
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 500;">Quick Servo Presets:</div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="btn-snap" style="background: linear-gradient(135deg, #06b6d4, #0891b2); border: none; padding: 0.5rem 0.9rem; font-size: 0.8rem;" onclick="sendManualServoCommand(0)">
+                  📦 Dry (0°)
+                </button>
+                <button type="button" class="btn-snap" style="background: linear-gradient(135deg, #64748b, #475569); border: none; padding: 0.5rem 0.9rem; font-size: 0.8rem;" onclick="sendManualServoCommand(90)">
+                  ⚖️ Neutral (90°)
+                </button>
+                <button type="button" class="btn-snap" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; padding: 0.5rem 0.9rem; font-size: 0.8rem;" onclick="sendManualServoCommand(180)">
+                  🍃 Wet (180°)
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Angle Slider -->
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 500;">
+                <span>Custom Rotation Angle:</span>
+                <strong id="slider-angle-val" style="color: #6366f1;">90°</strong>
+              </div>
+              <div style="display: flex; gap: 0.8rem; align-items: center;">
+                <input type="range" id="manual-servo-slider" min="0" max="180" value="90" style="flex: 1; accent-color: #6366f1; cursor: pointer;" oninput="document.getElementById('slider-angle-val').textContent = this.value + '°'">
+                <button type="button" class="btn-feed" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="sendManualServoCommand(parseInt(document.getElementById('manual-servo-slider').value))">
+                  Apply Angle
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="manual-servo-status" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.8rem; min-height: 1rem;"></div>
+        </div>
+
+        <!-- Middle Grid (ESP32 Stream, AI Inspector, Latest Result) -->
+        <div class="grid-3-col" style="margin-top: 1.5rem;">
+          
+          <!-- Panel 1: Live Camera Stream & Module Setup -->
+          <div class="panel-card" id="camera-panel-main">
+            <div class="panel-header">
+              <div class="panel-title">📷 Live Camera Stream & Module Setup</div>
+              <div class="badge-live" id="stream-live-badge">CAMERA OFFLINE</div>
+            </div>
+
+            <!-- Camera Controls Bar -->
+            <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.8rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem;">
+                <div>
+                  <label style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 500;">Camera Module</label>
+                  <select id="camera-source-select" class="ip-input" style="width: 100%; padding: 0.45rem 0.5rem; font-size: 0.78rem;">
+                    <option value="AI_THINKER" selected>📷 ESP32-CAM (AI-Thinker OV2640)</option>
+                    <option value="ESP_EYE">📷 ESP32-CAM (ESP-EYE / OV3660)</option>
+                    <option value="M5STACK_PSRAM">📷 ESP32-CAM (M5Stack PSRAM)</option>
+                    <option value="TTGO_T_JOURNAL">📷 ESP32-CAM (TTGO T-Journal)</option>
+                    <option value="WROVER_KIT">📷 ESP32-CAM (WROVER-KIT)</option>
+                    <option value="WEBCAM_LOCAL">💻 Local Browser WebCam</option>
+                    <option value="CUSTOM_MJPEG">🌐 Custom MJPEG / RTSP Stream</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 500;">Resolution</label>
+                  <select id="camera-resolution-select" class="ip-input" style="width: 100%; padding: 0.45rem 0.5rem; font-size: 0.78rem;">
+                    <option value="VGA" selected>VGA (640x480)</option>
+                    <option value="SVGA">SVGA (800x600)</option>
+                    <option value="HD">HD (1280x720)</option>
+                    <option value="SXGA">SXGA (1280x1024)</option>
+                    <option value="UXGA">UXGA (1600x1200)</option>
+                    <option value="CIF">CIF (400x296)</option>
+                    <option value="QVGA">QVGA (320x240)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 500;">Target FPS</label>
+                  <select id="camera-fps-select" class="ip-input" style="width: 100%; padding: 0.45rem 0.5rem; font-size: 0.78rem;">
+                    <option value="5">5 FPS</option>
+                    <option value="10">10 FPS</option>
+                    <option value="15" selected>15 FPS</option>
+                    <option value="30">30 FPS</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="ip-input-group" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" id="esp32-ip" class="ip-input" value="192.168.193.156" placeholder="ESP32 IP / Stream URL" style="flex: 1;">
+                <button type="button" class="btn-feed" id="btn-open-feed" style="white-space: nowrap;">Start Feed</button>
+                <button type="button" class="btn-snap" id="btn-snap-segregate" style="white-space: nowrap;">Snap & Segregate</button>
+              </div>
+            </div>
+
+            <!-- Stream Viewport -->
+            <div class="camera-viewport" id="camera-viewport" style="position: relative; overflow: hidden; background: #050811; display: flex; align-items: center; justify-content: center; min-height: 240px; border-radius: 12px;">
+              <img id="stream-img" src="" alt="Live Stream" style="display: none; width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;">
+              <video id="webcam-video" autoplay playsinline style="display: none; width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;"></video>
+              <canvas id="snapshot-canvas" style="display: none;"></canvas>
+
+              <div id="camera-placeholder" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">📷</div>
+                <div style="font-weight: 500; color: var(--text-primary);">Camera Standby</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Select camera module source and click 'Start Feed'</div>
+              </div>
+            </div>
+
+            <!-- Viewport Tools Overlay Bar -->
+            <div style="display: flex; gap: 0.4rem; justify-content: space-between; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
+              <div id="stream-spec-badge" style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 500;">
+                Module: <span id="active-module-name" style="color: #38bdf8;">AI-Thinker OV2640</span>
+              </div>
+              <div style="display: flex; gap: 0.35rem;">
+                <button type="button" class="btn-feed" id="btn-flip-h" style="padding: 0.3rem 0.6rem; font-size: 0.72rem;" title="Flip Horizontal">↔ Flip H</button>
+                <button type="button" class="btn-feed" id="btn-flip-v" style="padding: 0.3rem 0.6rem; font-size: 0.72rem;" title="Flip Vertical">↕ Flip V</button>
+                <button type="button" class="btn-feed" id="btn-flash-led" style="padding: 0.3rem 0.6rem; font-size: 0.72rem;" title="Toggle Flash LED">💡 Flash LED</button>
+                <button type="button" class="btn-feed" id="btn-fullscreen" style="padding: 0.3rem 0.6rem; font-size: 0.72rem;" title="Toggle Fullscreen">⤢ Fullscreen</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel 2: Live AI Classifier & Data Inspector -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">⚡ Live AI Classifier & Data Inspector</div>
+              <div class="badge-live">LIVE DATA</div>
+            </div>
+
+            <div class="inspector-preview" id="inspector-preview-box">
+              <img src="" id="inspector-img" alt="Uploaded Waste" style="display: none;">
+              <div id="inspector-placeholder" style="text-align: center; color: var(--text-secondary);">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">🔍</div>
+                <div style="font-size: 0.85rem;">No Image Selected</div>
+              </div>
+            </div>
+
+            <div class="telemetry-row">
+              <div class="telemetry-pill">
+                Wi-Fi RSSI
+                <strong style="color: #34d399;">-58 dBm (Strong)</strong>
+              </div>
+              <div class="telemetry-pill">
+                UART Baud
+                <strong>9600 Baud</strong>
+              </div>
+            </div>
+
+            <input type="file" id="dashboard-file-input" accept="image/*" style="display: none;">
+            <button type="button" class="btn-snap" style="width: 100%;" onclick="document.getElementById('dashboard-file-input').click()">
+              Upload Waste Image
+            </button>
+          </div>
+
+          <!-- Panel 3: Latest Classification -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">🎯 Latest Classification</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary);" id="latest-time">--:--:--</div>
+            </div>
+
+            <div class="gauge-wrapper">
+              <div class="circular-gauge">
+                <svg viewBox="0 0 100 100">
+                  <circle class="gauge-bg" cx="50" cy="50" r="45"></circle>
+                  <circle class="gauge-circle" id="gauge-circle-element" cx="50" cy="50" r="45"></circle>
+                </svg>
+                <div class="gauge-text">
+                  <div class="gauge-percent" id="latest-pct">0%</div>
+                </div>
+              </div>
+              <div class="result-badge-mini wet" id="latest-badge">WET WASTE</div>
+            </div>
+
+            <div class="classification-details">
+              <div class="detail-item">
+                <span>Material Type</span>
+                <strong id="detail-material">Organic / Wet Waste</strong>
+              </div>
+              <div class="detail-item">
+                <span>Confidence</span>
+                <strong id="detail-conf">0.0%</strong>
+              </div>
+              <div class="detail-item">
+                <span>Confidence Threshold</span>
+                <strong id="detail-threshold-status" style="color: #34d399;">HIGH (≥70%)</strong>
+              </div>
+              <div class="detail-item">
+                <span>Processing Time</span>
+                <strong id="detail-time">0.0 sec</strong>
+              </div>
+              <div class="detail-item">
+                <span>Action Taken</span>
+                <strong id="detail-action" style="color: #34d399;">Sorted to WET Bin</strong>
+              </div>
+              <div class="detail-item">
+                <span>Servo Position</span>
+                <strong id="detail-servo">Servo 1: 90°</strong>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Lower Grid (Bin Status & Analytics) -->
+        <div class="grid-2-col" style="margin-top: 1.5rem;">
+          
+          <!-- Bin Status Panel -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">🗑️ Bin Status & Sensor Telemetry</div>
+              <button type="button" class="btn-snap" id="btn-test-ai">Test AI Classifier</button>
+            </div>
+
+            <div class="bin-status-grid">
+              <!-- Dry Bin -->
+              <div class="bin-card">
+                <div class="bin-header">
+                  <span>Dry Waste Bin</span>
+                  <span style="color: #34d399;" id="dry-bin-status">NORMAL</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.35rem;">Fill Level <span id="dry-fill-text">0%</span></div>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill dry-fill" id="dry-bin-bar"></div>
+                </div>
+                <div class="sensor-list">
+                  <div class="sensor-item"><span>IR Sensor 1 (Low)</span><strong style="color: #34d399;">Clear</strong></div>
+                  <div class="sensor-item"><span>IR Sensor 2 (Full)</span><strong style="color: #34d399;">Clear</strong></div>
+                </div>
+              </div>
+
+              <!-- Wet Bin -->
+              <div class="bin-card">
+                <div class="bin-header">
+                  <span>Wet Waste Bin</span>
+                  <span style="color: #34d399;" id="wet-bin-status">NORMAL</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.35rem;">Fill Level <span id="wet-fill-text">0%</span></div>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill wet-fill" id="wet-bin-bar"></div>
+                </div>
+                <div class="sensor-list">
+                  <div class="sensor-item"><span>IR Sensor 1 (Low)</span><strong style="color: #34d399;">Clear</strong></div>
+                  <div class="sensor-item"><span>IR Sensor 2 (Full)</span><strong style="color: #34d399;">Clear</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Material Distribution Donut Chart -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">🍩 Material Ratio</div>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-ratio"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Live Trend Line Chart -->
+        <div class="panel-card" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">📈 Classification Trend (Live Activity)</div>
+          </div>
+          <div style="height: 200px; position: relative;">
+            <canvas id="chart-trend"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 2: LIVE CAMERA -->
+      <div id="tab-camera" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">📷 ESP32-CAM & WebCam Live Streaming Station</div>
+            <div class="badge-live">MULTI-MODULE FEED</div>
+          </div>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">Select hardware camera module preset or use local WebCam to stream live video, adjust resolution/FPS, and inspect waste items in high definition.</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <!-- Board Preset 1 -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem;">
+              <div style="font-weight: 600; color: #38bdf8; margin-bottom: 0.3rem;">📷 AI-Thinker ESP32-CAM</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">OV2640 2MP Sensor | GPIO 4 Flash LED | Onboard PSRAM</div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">Pins: XCLK=0, PCLK=22, VSYNC=25, HREF=23, SIOD=26, SIOC=27</div>
+            </div>
+            <!-- Board Preset 2 -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem;">
+              <div style="font-weight: 600; color: #34d399; margin-bottom: 0.3rem;">📷 ESP-EYE / OV3660</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">OV3660 3MP Sensor | Onboard Microphone | Dual Buttons</div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">Pins: XCLK=4, PCLK=25, VSYNC=5, HREF=27, SIOD=18, SIOC=23</div>
+            </div>
+            <!-- Board Preset 3 -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem;">
+              <div style="font-weight: 600; color: #f59e0b; margin-bottom: 0.3rem;">💻 Browser Local WebCam</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">HTML5 Video Stream | Zero Hardware Required | Canvas Capture</div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">Instant streaming & testing directly inside your browser!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: LIVE AI INSPECTOR -->
+      <div id="tab-inspector" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">⚡ Live AI Inspector & Model Details</div>
+          </div>
+          <p style="color: var(--text-secondary);">Model Architecture: <strong>MobileNetV2 (Keras Binary Classification)</strong></p>
+        </div>
+      </div>
+
+      <!-- TAB 4: CLASSIFICATION LOGS -->
+      <div id="tab-logs" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">📄 Classification Logs</div>
+          </div>
+          <div id="logs-container">
+            <!-- Firebase live log items -->
+            <p style="color: var(--text-secondary);">Loading logs from Firebase Realtime DB...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: BIN STATUS -->
+      <div id="tab-bins" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">🗑️ Smart Bin Telemetry</div>
+          </div>
+          <p style="color: var(--text-secondary);">Monitor IR Sensors and Ultrasonic bin level fill telemetry.</p>
+        </div>
+      </div>
+
+      <!-- TAB 6: REPORTS & ANALYTICS -->
+      <div id="tab-analytics" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">📈 Analytics & System Telemetry</div>
+          </div>
+          <p style="color: var(--text-secondary);">Historical waste metrics and AI model accuracy telemetry.</p>
+        </div>
+      </div>
+
+      <!-- TAB 7: SYSTEM SETTINGS -->
+      <div id="tab-settings" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">⚙️ System Settings</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 500px;">
+            <div>
+              <label style="display: block; font-size: 0.85rem; margin-bottom: 0.4rem;">Flask API Host</label>
+              <input type="text" class="ip-input" style="width: 100%;" value="http://127.0.0.1:5000">
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.85rem; margin-bottom: 0.4rem;">Firebase Database URL</label>
+              <input type="text" class="ip-input" style="width: 100%;" value="https://garbage-fa1b3-default-rtdb.firebaseio.com">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Live Clock
+    function updateClock() {
+      const now = new Date();
+      const options = { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+      document.getElementById('live-clock').textContent = now.toLocaleDateString('en-GB', options).replace(',', ' |');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Theme Toggle
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+    btnThemeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      themeIcon.textContent = nextTheme === 'dark' ? '🌙' : '☀️';
+      themeText.textContent = nextTheme === 'dark' ? 'Dark Mode' : 'Light Mode';
+    });
+
+    // Navigation Tabs
+    const navItems = document.querySelectorAll('.nav-item');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
+
+    const pageMeta = {
+      'tab-dashboard': { title: 'Dashboard', subtitle: 'Real-time overview of your waste segregation system' },
+      'tab-camera': { title: 'Live ESP32-CAM Feed', subtitle: 'Real-time camera viewport and LAN stream' },
+      'tab-inspector': { title: 'Live AI Inspector', subtitle: 'Model inference telemetry & image inspection' },
+      'tab-logs': { title: 'Classification Logs', subtitle: 'Historical waste detection logs' },
+      'tab-bins': { title: 'Bin Status Telemetry', subtitle: 'IR Sensors & ultrasonic fill level monitors' },
+      'tab-analytics': { title: 'Reports & Analytics', subtitle: 'Segregation trends and ratio analytics' },
+      'tab-settings': { title: 'System Settings', subtitle: 'Configure ESP32 IP, Flask backend, and Firebase DB' }
+    };
+
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const targetTab = item.getAttribute('data-tab');
+        navItems.forEach(i => i.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        item.classList.add('active');
+        document.getElementById(targetTab).classList.add('active');
+        
+        if (pageMeta[targetTab]) {
+          pageTitle.textContent = pageMeta[targetTab].title;
+          pageSubtitle.textContent = pageMeta[targetTab].subtitle;
+        }
+      });
+    });
+
+    // Chart.js Graphs
+    let ratioChart = null;
+    let trendChart = null;
+
+    function initCharts() {
+      const ctxRatio = document.getElementById('chart-ratio').getContext('2d');
+      ratioChart = new Chart(ctxRatio, {
+        type: 'doughnut',
+        data: {
+          labels: ['Dry Waste', 'Wet Waste'],
+          datasets: [{
+            data: [0, 0],
+            backgroundColor: ['#06b6d4', '#10b981'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+        }
+      });
+
+      const ctxTrend = document.getElementById('chart-trend').getContext('2d');
+      trendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+          labels: ['10m ago', '8m ago', '6m ago', '4m ago', '2m ago', 'Just Now'],
+          datasets: [
+            { label: 'Dry Waste', data: [0, 0, 0, 0, 0, 0], borderColor: '#06b6d4', tension: 0.4 },
+            { label: 'Wet Waste', data: [0, 0, 0, 0, 0, 0], borderColor: '#10b981', tension: 0.4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8' } },
+            y: { ticks: { color: '#94a3b8' } }
+          }
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', initCharts);
+
+    // ========================================================
+    // Multi-Module Camera Controller & Live Streaming Handler
+    // ========================================================
+    const cameraSourceSelect = document.getElementById('camera-source-select');
+    const cameraResSelect = document.getElementById('camera-resolution-select');
+    const cameraFpsSelect = document.getElementById('camera-fps-select');
+    const esp32IpInput = document.getElementById('esp32-ip');
+    const btnOpenFeed = document.getElementById('btn-open-feed');
+    const btnSnapSegregate = document.getElementById('btn-snap-segregate');
+    const cameraViewport = document.getElementById('camera-viewport');
+    const streamImg = document.getElementById('stream-img');
+    const webcamVideo = document.getElementById('webcam-video');
+    const snapshotCanvas = document.getElementById('snapshot-canvas');
+    const cameraPlaceholder = document.getElementById('camera-placeholder');
+    const streamLiveBadge = document.getElementById('stream-live-badge');
+    const activeModuleName = document.getElementById('active-module-name');
+
+    const btnFlipH = document.getElementById('btn-flip-h');
+    const btnFlipV = document.getElementById('btn-flip-v');
+    const btnFlashLed = document.getElementById('btn-flash-led');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+
+    let webcamStreamTrack = null;
+    let isFlippedH = false;
+    let isFlippedV = false;
+    let isFlashOn = false;
+
+    const moduleNamesMap = {
+      'AI_THINKER': 'ESP32-CAM (AI-Thinker OV2640)',
+      'ESP_EYE': 'ESP32-CAM (ESP-EYE / OV3660)',
+      'M5STACK_PSRAM': 'ESP32-CAM (M5Stack PSRAM)',
+      'TTGO_T_JOURNAL': 'ESP32-CAM (TTGO T-Journal)',
+      'WROVER_KIT': 'ESP32-CAM (WROVER-KIT)',
+      'WEBCAM_LOCAL': 'Local Browser WebCam',
+      'CUSTOM_MJPEG': 'Custom MJPEG / RTSP Stream'
+    };
+
+    const resDimensionsMap = {
+      'VGA': { width: 640, height: 480 },
+      'SVGA': { width: 800, height: 600 },
+      'HD': { width: 1280, height: 720 },
+      'SXGA': { width: 1280, height: 1024 },
+      'UXGA': { width: 1600, height: 1200 },
+      'CIF': { width: 400, height: 296 },
+      'QVGA': { width: 320, height: 240 }
+    };
+
+    if (cameraSourceSelect) {
+      cameraSourceSelect.addEventListener('change', () => {
+        const val = cameraSourceSelect.value;
+        if (activeModuleName) activeModuleName.textContent = moduleNamesMap[val] || val;
+        
+        if (val === 'WEBCAM_LOCAL') {
+          esp32IpInput.value = 'Browser Local MediaStream';
+          esp32IpInput.disabled = true;
+        } else {
+          esp32IpInput.disabled = false;
+          if (esp32IpInput.value === 'Browser Local MediaStream') {
+            esp32IpInput.value = '192.168.193.156';
+          }
+        }
+        stopActiveWebcam();
+      });
+    }
+
+    function updateTransform() {
+      const transformStr = `scale(${isFlippedH ? -1 : 1}, ${isFlippedV ? -1 : 1})`;
+      if (streamImg) streamImg.style.transform = transformStr;
+      if (webcamVideo) webcamVideo.style.transform = transformStr;
+    }
+
+    if (btnFlipH) {
+      btnFlipH.addEventListener('click', () => {
+        isFlippedH = !isFlippedH;
+        btnFlipH.style.background = isFlippedH ? 'var(--accent-cyan-bg)' : '';
+        btnFlipH.style.color = isFlippedH ? 'var(--accent-cyan)' : '';
+        updateTransform();
+      });
+    }
+
+    if (btnFlipV) {
+      btnFlipV.addEventListener('click', () => {
+        isFlippedV = !isFlippedV;
+        btnFlipV.style.background = isFlippedV ? 'var(--accent-cyan-bg)' : '';
+        btnFlipV.style.color = isFlippedV ? 'var(--accent-cyan)' : '';
+        updateTransform();
+      });
+    }
+
+    if (btnFullscreen && cameraViewport) {
+      btnFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          cameraViewport.requestFullscreen().catch(err => alert(`Error enabling fullscreen: ${err.message}`));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+
+    if (btnFlashLed) {
+      btnFlashLed.addEventListener('click', async () => {
+        isFlashOn = !isFlashOn;
+        btnFlashLed.style.background = isFlashOn ? 'rgba(245, 158, 11, 0.2)' : '';
+        btnFlashLed.style.color = isFlashOn ? '#f59e0b' : '';
+
+        let ip = esp32IpInput ? esp32IpInput.value.trim() : '';
+        if (ip && cameraSourceSelect.value !== 'WEBCAM_LOCAL') {
+          if (!ip.startsWith('http://') && !ip.startsWith('https://')) ip = 'http://' + ip;
+          const ctrlUrl = `${ip}/control?var=flash&val=${isFlashOn ? 1 : 0}`;
+          try {
+            await fetch(ctrlUrl, { mode: 'no-cors' });
+          } catch (e) {
+            console.log('Flash LED control request sent');
+          }
+        }
+      });
+    }
+
+    function stopActiveWebcam() {
+      if (webcamStreamTrack) {
+        webcamStreamTrack.getTracks().forEach(track => track.stop());
+        webcamStreamTrack = null;
+      }
+      if (webcamVideo) {
+        webcamVideo.srcObject = null;
+        webcamVideo.style.display = 'none';
+      }
+    }
+
+    if (btnOpenFeed) {
+      btnOpenFeed.addEventListener('click', async () => {
+        const sourceMode = cameraSourceSelect ? cameraSourceSelect.value : 'AI_THINKER';
+        const resKey = cameraResSelect ? cameraResSelect.value : 'VGA';
+        const targetFps = cameraFpsSelect ? cameraFpsSelect.value : 15;
+        const dims = resDimensionsMap[resKey] || { width: 640, height: 480 };
+
+        if (sourceMode === 'WEBCAM_LOCAL') {
+          stopActiveWebcam();
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: dims.width },
+                height: { ideal: dims.height },
+                frameRate: { ideal: parseInt(targetFps) }
+              }
+            });
+            webcamStreamTrack = stream;
+            webcamVideo.srcObject = stream;
+            webcamVideo.style.display = 'block';
+            streamImg.style.display = 'none';
+            cameraPlaceholder.style.display = 'none';
+            if (streamLiveBadge) {
+              streamLiveBadge.textContent = `LIVE WEBCAM (${dims.width}x${dims.height})`;
+              streamLiveBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+              streamLiveBadge.style.color = '#10b981';
+            }
+          } catch (err) {
+            alert(`Unable to access browser webcam: ${err.message}. Please allow camera permissions.`);
+            console.error(err);
+          }
+        } else {
+          stopActiveWebcam();
+          let ip = esp32IpInput.value.trim();
+          if (!ip) {
+            alert('Please enter a valid ESP32-CAM IP address or stream URL.');
+            return;
+          }
+          if (!ip.startsWith('http://') && !ip.startsWith('https://')) {
+            ip = 'http://' + ip;
+          }
+          let streamUrl = ip.endsWith('/stream') ? ip : (ip.endsWith('/') ? `${ip}stream` : `${ip}/stream`);
+          streamUrl += `?res=${resKey}&fps=${targetFps}`;
+
+          streamImg.src = streamUrl;
+          streamImg.style.display = 'block';
+          webcamVideo.style.display = 'none';
+          cameraPlaceholder.style.display = 'none';
+          if (streamLiveBadge) {
+            streamLiveBadge.textContent = `LIVE STREAM (${resKey})`;
+            streamLiveBadge.style.background = 'rgba(6, 182, 212, 0.2)';
+            streamLiveBadge.style.color = '#06b6d4';
+          }
+
+          streamImg.onerror = () => {
+            streamImg.style.display = 'none';
+            cameraPlaceholder.style.display = 'block';
+            if (streamLiveBadge) {
+              streamLiveBadge.textContent = 'STREAM DISCONNECTED';
+              streamLiveBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+              streamLiveBadge.style.color = '#f43f5e';
+            }
+          };
+        }
+      });
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, { type: mime });
+    }
+
+    if (btnSnapSegregate) {
+      btnSnapSegregate.addEventListener('click', async () => {
+        const sourceMode = cameraSourceSelect ? cameraSourceSelect.value : 'AI_THINKER';
+        btnSnapSegregate.disabled = true;
+        btnSnapSegregate.textContent = 'Snapping...';
+
+        try {
+          if (sourceMode === 'WEBCAM_LOCAL' && webcamStreamTrack) {
+            // WebCam Canvas Frame Capture
+            const width = webcamVideo.videoWidth || 640;
+            const height = webcamVideo.videoHeight || 480;
+            snapshotCanvas.width = width;
+            snapshotCanvas.height = height;
+            const ctx = snapshotCanvas.getContext('2d');
+
+            if (isFlippedH || isFlippedV) {
+              ctx.translate(isFlippedH ? width : 0, isFlippedV ? height : 0);
+              ctx.scale(isFlippedH ? -1 : 1, isFlippedV ? -1 : 1);
+            }
+            ctx.drawImage(webcamVideo, 0, 0, width, height);
+
+            const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.92);
+            inspectorImg.src = dataUrl;
+            inspectorImg.style.display = 'block';
+            inspectorPlaceholder.style.display = 'none';
+
+            const file = dataURLtoFile(dataUrl, `webcam_snap_${Date.now()}.jpg`);
+            await classifyImage(file, dataUrl);
+
+          } else {
+            // ESP32 or Network Camera Capture
+            let ip = esp32IpInput.value.trim();
+            if (!ip) {
+              alert('Please enter a valid ESP32-CAM IP address.');
+              return;
+            }
+            if (!ip.startsWith('http://') && !ip.startsWith('https://')) ip = 'http://' + ip;
+            const captureUrl = `${ip}/capture`;
+
+            try {
+              const res = await fetch(captureUrl, { mode: 'cors' });
+              if (!res.ok) throw new Error('ESP32 capture response error');
+              const blob = await res.blob();
+              const file = new File([blob], `esp32_snap_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                inspectorImg.src = e.target.result;
+                inspectorImg.style.display = 'block';
+                inspectorPlaceholder.style.display = 'none';
+                classifyImage(file, e.target.result);
+              };
+              reader.readAsDataURL(file);
+            } catch (fetchErr) {
+              // Canvas fallback snapshot if network image stream is displayed
+              if (streamImg && streamImg.style.display !== 'none' && streamImg.complete && streamImg.naturalWidth > 0) {
+                snapshotCanvas.width = streamImg.naturalWidth;
+                snapshotCanvas.height = streamImg.naturalHeight;
+                const ctx = snapshotCanvas.getContext('2d');
+                ctx.drawImage(streamImg, 0, 0);
+                const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.9);
+                inspectorImg.src = dataUrl;
+                inspectorImg.style.display = 'block';
+                inspectorPlaceholder.style.display = 'none';
+                const file = dataURLtoFile(dataUrl, `esp32_canvas_snap_${Date.now()}.jpg`);
+                await classifyImage(file, dataUrl);
+              } else {
+                throw fetchErr;
+              }
+            }
+          }
+        } catch (err) {
+          alert(`Unable to snap image frame. Please check camera connection or select 'Local Browser WebCam' / 'Upload Waste Image'.`);
+          console.warn(err);
+        } finally {
+          btnSnapSegregate.disabled = false;
+          btnSnapSegregate.textContent = 'Snap & Segregate';
+        }
+      });
+    }
+
+    // Image Upload & Classification
+    const dashboardFileInput = document.getElementById('dashboard-file-input');
+    const inspectorImg = document.getElementById('inspector-img');
+    const inspectorPlaceholder = document.getElementById('inspector-placeholder');
+
+    dashboardFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          inspectorImg.src = evt.target.result;
+          inspectorImg.style.display = 'block';
+          inspectorPlaceholder.style.display = 'none';
+          classifyImage(file, evt.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('btn-test-ai').addEventListener('click', () => {
+      dashboardFileInput.click();
+    });
+
+    async function classifyImage(file, dataUrl) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      let targetUrl = '/predict';
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        targetUrl = 'http://127.0.0.1:5000/predict';
+      }
+
+      const startTime = performance.now();
+      let response = null;
+
+      try {
+        response = await fetch(targetUrl, { method: 'POST', body: formData });
+        const contentType = response.headers.get('content-type') || '';
+        if (targetUrl === '/predict' && (!response.ok || contentType.includes('text/html'))) {
+          targetUrl = 'http://127.0.0.1:5000/predict';
+          response = await fetch(targetUrl, { method: 'POST', body: formData });
+        }
+      } catch (err) {
+        if (targetUrl === '/predict') {
+          try {
+            targetUrl = 'http://127.0.0.1:5000/predict';
+            response = await fetch(targetUrl, { method: 'POST', body: formData });
+          } catch (e) {
+            alert('Unable to connect to Flask server at http://127.0.0.1:5000. Please ensure python run.py is running.');
+            return;
+          }
+        }
+      }
+
+      if (!response || !response.ok) return;
+
+      const data = await response.json();
+      const endTime = performance.now();
+      const durationSec = ((endTime - startTime) / 1000).toFixed(2);
+
+      if (data.status === 'success') {
+        updateLatestDisplay(file.name, data.prediction, durationSec);
+        if (window.savePredictionToFirebase) {
+          window.savePredictionToFirebase(file.name, data.prediction);
+        }
+      }
+    }
+
+    function updateLatestDisplay(filename, pred, durationSec) {
+      const isWet = pred.class.toLowerCase() === 'wet';
+      const confPct = (pred.confidence * 100).toFixed(1);
+      const isAccepted = pred.is_accepted !== undefined ? pred.is_accepted : (pred.confidence >= 0.70);
+
+      document.getElementById('latest-pct').textContent = confPct + '%';
+      document.getElementById('latest-badge').className = 'result-badge-mini ' + (isWet ? 'wet' : 'dry');
+      document.getElementById('latest-badge').textContent = isWet ? 'WET WASTE' : 'DRY WASTE';
+      document.getElementById('detail-material').textContent = isWet ? 'Organic / Wet Waste' : 'Dry Recyclable Waste';
+      document.getElementById('detail-conf').textContent = confPct + '%';
+      document.getElementById('detail-time').textContent = durationSec + ' sec';
+      document.getElementById('detail-action').textContent = pred.action_taken || (isWet ? 'Sorted to WET Bin' : 'Sorted to DRY Bin');
+      document.getElementById('detail-servo').textContent = pred.servo_position || (isWet ? 'Servo 1: 180°' : 'Servo 1: 0°');
+
+      const statusEl = document.getElementById('detail-threshold-status');
+      if (statusEl) {
+        statusEl.textContent = isAccepted ? 'HIGH (≥70%)' : 'LOW CONFIDENCE (<70% FALLBACK)';
+        statusEl.style.color = isAccepted ? '#34d399' : '#f59e0b';
+      }
+
+      document.getElementById('kpi-servo').textContent = pred.servo_position || (isWet ? 'Servo 1: 180°' : 'Servo 1: 0°');
+      document.getElementById('latest-time').textContent = new Date().toLocaleTimeString();
+
+      // SVG Gauge offset
+      const circle = document.getElementById('gauge-circle-element');
+      const offset = 283 - (283 * (pred.confidence));
+      circle.style.strokeDashoffset = offset;
+      circle.style.stroke = isWet ? '#10b981' : '#06b6d4';
+
+      // Update Inspector Snapshot Image if image_url is present
+      if (pred.image_url && inspectorImg) {
+        inspectorImg.src = pred.image_url;
+        inspectorImg.style.display = 'block';
+        if (inspectorPlaceholder) inspectorPlaceholder.style.display = 'none';
+      }
+    }
+
+    async function sendManualServoCommand(angle) {
+      const statusEl = document.getElementById('manual-servo-status');
+      if (statusEl) statusEl.textContent = `⏳ Sending manual command: Servo to ${angle}°...`;
+      
+      const payload = {
+        target_angle: angle,
+        command_id: 'cmd_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+        source: 'dashboard_ui',
+        timestamp: Date.now()
+      };
+      
+      try {
+        const firebaseDbUrl = 'https://garbage-fa1b3-default-rtdb.firebaseio.com/manual_control.json';
+        const response = await fetch(firebaseDbUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+          if (statusEl) statusEl.innerHTML = `<span style="color: #34d399;">✅ Manual command sent! Servo set to <strong>${angle}°</strong></span>`;
+          const kpiServo = document.getElementById('kpi-servo');
+          if (kpiServo) kpiServo.textContent = `Servo 1: ${angle}°`;
+        } else {
+          if (statusEl) statusEl.innerHTML = `<span style="color: #ef4444;">❌ Failed to send command (HTTP ${response.status})</span>`;
+        }
+      } catch (err) {
+        if (statusEl) statusEl.innerHTML = `<span style="color: #ef4444;">❌ Firebase connection error: ${err.message}</span>`;
+      }
+    }
+  </script>
+
+  <!-- Firebase Realtime Database Integration Module -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDdsLv5m3Tf0HHBC61nHGI4qv8y2nTFGu0",
+      authDomain: "garbage-fa1b3.firebaseapp.com",
+      databaseURL: "https://garbage-fa1b3-default-rtdb.firebaseio.com",
+      projectId: "garbage-fa1b3",
+      storageBucket: "garbage-fa1b3.firebasestorage.app",
+      messagingSenderId: "853669501284",
+      appId: "1:853669501284:web:e64a865332efd381e88271",
+      measurementId: "G-CMN8XQL866"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.savePredictionToFirebase = function(filename, prediction) {
+      try {
+        const predictionsRef = ref(db, 'predictions');
+        push(predictionsRef, {
+          filename: filename,
+          class: prediction.class,
+          class_id: prediction.class_id,
+          confidence: prediction.confidence,
+          raw_score: prediction.raw_score,
+          action_taken: prediction.action_taken,
+          servo_position: prediction.servo_position,
+          timestamp: Date.now()
+        });
+
+        // Also update ESP32-CAM status to ONLINE
+        const espHeartbeatRef = ref(db, 'hardware_heartbeats/esp32_cam');
+        push(ref(db, 'hardware_heartbeats/esp32_cam'));
+        update(espHeartbeatRef, {
+          device: 'esp32_cam',
+          ip: '192.168.159.156',
+          status: 'ONLINE',
+          timestamp: Date.now()
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    // Listen to predictions node for live KPI metrics and logs
+    const predictionsRef = query(ref(db, 'predictions'), limitToLast(50));
+    onValue(predictionsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
+
+      const items = Object.values(data);
+      const total = items.length;
+      let dryCount = 0;
+      let wetCount = 0;
+      let totalConf = 0;
+
+      items.forEach(i => {
+        if ((i.class || '').toLowerCase() === 'wet') wetCount++;
+        else dryCount++;
+        totalConf += (i.confidence || 0);
+      });
+
+      // Update Latest Classification Gauge Card dynamically from Firebase stream
+      if (items.length > 0) {
+        const latest = items[items.length - 1];
+        updateLatestDisplay(latest.filename || 'esp32_capture.jpg', latest, '0.42');
+      }
+
+      document.getElementById('kpi-total').textContent = total;
+      document.getElementById('kpi-dry').textContent = dryCount;
+      document.getElementById('kpi-wet').textContent = wetCount;
+      document.getElementById('kpi-dry-pct').textContent = ((dryCount/total)*100).toFixed(1) + '% of total';
+      document.getElementById('kpi-wet-pct').textContent = ((wetCount/total)*100).toFixed(1) + '% of total';
+      document.getElementById('kpi-conf').textContent = ((totalConf/total)*100).toFixed(1) + '%';
+
+      // Update Fill Levels Simulation
+      const dryFillPct = Math.min(100, Math.round((dryCount * 4) % 100));
+      const wetFillPct = Math.min(100, Math.round((wetCount * 6) % 100));
+      document.getElementById('dry-fill-text').textContent = dryFillPct + '%';
+      document.getElementById('dry-bin-bar').style.width = dryFillPct + '%';
+      document.getElementById('wet-fill-text').textContent = wetFillPct + '%';
+      document.getElementById('wet-bin-bar').style.width = wetFillPct + '%';
+
+      // Update Chart.js ratio graph
+      if (window.ratioChart) {
+        window.ratioChart.data.datasets[0].data = [dryCount, wetCount];
+        window.ratioChart.update();
+      }
+
+      // Populate Logs tab
+      const logsContainer = document.getElementById('logs-container');
+      if (logsContainer) {
+        logsContainer.innerHTML = `
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="text-align: left; border-bottom: 1px solid var(--card-border); color: var(--text-secondary);">
+                <th style="padding: 0.6rem;">Timestamp</th>
+                <th style="padding: 0.6rem;">Image</th>
+                <th style="padding: 0.6rem;">Category</th>
+                <th style="padding: 0.6rem;">Confidence</th>
+                <th style="padding: 0.6rem;">Action Taken</th>
+                <th style="padding: 0.6rem;">Servo Position</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.slice().reverse().map(item => {
+                const isWet = (item.class || '').toLowerCase() === 'wet';
+                const imgThumb = item.image_url ? `<a href="${item.image_url}" target="_blank" title="View in Firebase Storage"><img src="${item.image_url}" style="width: 38px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); vertical-align: middle;"></a>` : '<span style="color:var(--text-secondary);">-</span>';
+                return `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 0.6rem;">${item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}</td>
+                    <td style="padding: 0.6rem;">${imgThumb}</td>
+                    <td style="padding: 0.6rem;"><span class="result-badge-mini ${isWet ? 'wet' : 'dry'}">${item.class}</span></td>
+                    <td style="padding: 0.6rem;">${((item.confidence||0)*100).toFixed(1)}%</td>
+                    <td style="padding: 0.6rem;">${item.action_taken || '-'}</td>
+                    <td style="padding: 0.6rem;">${item.servo_position || '-'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    });
+
+    // Listen to hardware_heartbeats node for live Online/Offline status
+    const heartbeatsRef = ref(db, 'hardware_heartbeats');
+    onValue(heartbeatsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
+
+      const now = Date.now();
+
+      // ESP32-CAM Heartbeat
+      if (data.esp32_cam) {
+        const esp = data.esp32_cam;
+        const statusStr = (esp.status || '').toUpperCase();
+        const diffSec = esp.timestamp ? Math.max(0, Math.round((now - esp.timestamp) / 1000)) : 0;
+        const isOnline = (statusStr === 'ONLINE' || statusStr === 'CONNECTED') && (diffSec < 3600 || !esp.timestamp);
+
+        const badge = document.getElementById('esp32-status-badge');
+        const ipText = document.getElementById('esp32-ip-text');
+        const lastSeen = document.getElementById('esp32-last-seen');
+
+        if (ipText && esp.ip) ipText.textContent = `IP: ${esp.ip}`;
+        if (lastSeen) lastSeen.textContent = isOnline ? (esp.timestamp ? `Active (${diffSec}s ago)` : 'Active (Online)') : `Last seen: ${diffSec}s ago`;
+
+        if (badge) {
+          if (isOnline) {
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.color = '#10b981';
+            badge.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            badge.innerHTML = '● ONLINE';
+          } else {
+            badge.style.background = 'rgba(239, 68, 68, 0.15)';
+            badge.style.color = '#ef4444';
+            badge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            badge.innerHTML = '○ OFFLINE';
+          }
+        }
+      }
+
+      // Arduino Uno / DevKit Heartbeat
+      if (data.arduino_uno) {
+        const ard = data.arduino_uno;
+        const statusStr = (ard.status || '').toUpperCase();
+        const diffSec = ard.timestamp ? Math.max(0, Math.round((now - ard.timestamp) / 1000)) : 0;
+        const isOnline = (statusStr === 'ONLINE' || statusStr === 'CONNECTED') && (diffSec < 3600 || !ard.timestamp);
+
+        const badge = document.getElementById('arduino-status-badge');
+        const ipText = document.getElementById('arduino-ip-text');
+        const lastSeen = document.getElementById('arduino-last-seen');
+
+        if (ipText && ard.ip) ipText.textContent = `IP: ${ard.ip}`;
+        if (lastSeen) lastSeen.textContent = isOnline ? (ard.timestamp ? `Active (${diffSec}s ago)` : 'Active (Online)') : `Last seen: ${diffSec}s ago`;
+
+        if (badge) {
+          if (isOnline) {
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.color = '#10b981';
+            badge.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            badge.innerHTML = '● ONLINE';
+          } else {
+            badge.style.background = 'rgba(239, 68, 68, 0.15)';
+            badge.style.color = '#ef4444';
+            badge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            badge.innerHTML = '○ OFFLINE';
+          }
+        }
+      }
+    });
+
+    // Listen to bin_status node for live IR sensor full alerts (Yellow = Dry Full, Green = Wet Full)
+    const binStatusRef = ref(db, 'bin_status');
+    onValue(binStatusRef, (snapshot) => {
+      const status = snapshot.val();
+      if (!status) return;
+
+      if (status.dry_bin_full) {
+        document.getElementById('dry-fill-text').textContent = '100% (FULL!)';
+        document.getElementById('dry-bin-bar').style.width = '100%';
+        document.getElementById('dry-bin-bar').style.background = '#eab308'; // Yellow Warning
+      }
+
+      if (status.wet_bin_full) {
+        document.getElementById('wet-fill-text').textContent = '100% (FULL!)';
+        document.getElementById('wet-bin-bar').style.width = '100%';
+        document.getElementById('wet-bin-bar').style.background = '#22c55e'; // Green Warning
+      }
+    });
+  </script>
+</body>
+</html>

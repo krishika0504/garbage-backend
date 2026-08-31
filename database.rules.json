@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "hardware_heartbeats": {
+      ".read": true,
+      ".write": true,
+      "$device_id": {
+        ".read": true,
+        ".write": true
+      },
+      ".indexOn": ["device", "status", "last_seen"]
+    },
+    "classifications": {
+      ".read": true,
+      ".write": true,
+      "$classification_id": {
+        ".read": true,
+        ".write": true
+      },
+      ".indexOn": ["category", "timestamp"]
+    }
+  }
+}
